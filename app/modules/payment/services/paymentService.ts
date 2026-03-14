@@ -1,74 +1,71 @@
 "use strict";
 
-interface PaymentParams {
-    userId: string;
-    cardDetails: {
-        number: string;
-        expiry: string;
-        cvv: string;
-        country: string;
-    };
-    amount: number;
-}
+import { PaymentRepository } from '../repositories/paymentRepository';
+import { userService } from '../../user-profile/services/userService';
+import { logger } from '../../../shared/logger';
+import { PaymentRequest } from '../types/payment';
+import { detectCardType } from '../utils/cardUtils';
 
-interface PaymentResult {
-    success: boolean;
-    transactionId?: string;
-    error?: string;
-}
+class PaymentService {
+    private paymentRepository: PaymentRepository;
 
-/**
- * Processes a payment
- * @param params - Payment parameters including userId and card details
- * @throws {Error} If required parameters are missing
- */
-export async function processPayment(params: PaymentParams): Promise<PaymentResult> {
-    // Validate required parameters
-    if (!params?.userId) {
-        throw new Error("User ID is required for payment processing");
+    constructor() {
+        this.paymentRepository = new PaymentRepository();
     }
-    
-    if (!params?.cardDetails) {
-        throw new Error("Card details are required");
-    }
-    
-    try {
-        // Determine if this is an international card
-        const isInternational = params.cardDetails.country !== 'US';
-        
-        // Common payment processing logic
-        if (isInternational) {
-            // International card processing path
-            // Ensure userId is passed to any subsequent service calls
-            const user = await getUserProfile(params.userId);
+
+    async processPayment(paymentRequest: PaymentRequest, userId?: string) {
+        try {
+            logger.info(`Processing payment for ${userId ? 'user' : 'guest'}`, {
+                amount: paymentRequest.amount,
+                currency: paymentRequest.currency,
+                cardType: detectCardType(paymentRequest.cardNumber)
+            });
             
-            // Process international payment
-            return await processInternationalPayment(params);
-        } else {
-            // Domestic card processing path
-            return await processDomesticPayment(params);
+            // Handle user data based on whether we have a user ID
+            let user = null;
+            if (userId) {
+                user = await userService.getUser(userId);
+                if (!user) {
+                    logger.warn(`User not found for ID: ${userId}, processing as guest`);
+                }
+            }
+            
+            // Additional validation for international payments
+            if (paymentRequest.currency !== 'USD') {
+                logger.info('Processing international payment', {
+                    currency: paymentRequest.currency
+                });
+                
+                // Add any additional international payment validations here
+                if (!this.validateInternationalPayment(paymentRequest)) {
+                    throw new Error('Invalid payment details for international transaction');
+                }
+            }
+            
+            // Process the payment
+            const paymentResult = await this.paymentRepository.createPayment({
+                ...paymentRequest,
+                userId: userId || undefined,
+                status: 'pending'
+            });
+            
+            // Additional processing logic would go here
+            
+            return paymentResult;
+        } catch (error) {
+            logger.error('Payment processing failed:', error);
+            throw new Error(`Payment processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-    } catch (error) {
-        console.error("Payment processing failed:", error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : "Unknown payment error"
-        };
+    }
+    
+    private validateInternationalPayment(paymentRequest: PaymentRequest): boolean {
+        // Implement country-specific validation logic
+        // For example, check if the card type is supported in the target country
+        const cardType = detectCardType(paymentRequest.cardNumber);
+        
+        // Add any additional validation rules for international payments
+        return true; // Simplified for example
     }
 }
 
-// Helper functions (mock implementations - replace with actual implementations)
-async function getUserProfile(userId: string) {
-    // Implementation to get user profile
-    return { id: userId, name: "User" };
-}
-
-async function processInternationalPayment(params: PaymentParams) {
-    // International payment processing logic
-    return { success: true, transactionId: "intl_" + Math.random().toString(36).substr(2, 9) };
-}
-
-async function processDomesticPayment(params: PaymentParams) {
-    // Domestic payment processing logic
-    return { success: true, transactionId: "dom_" + Math.random().toString(36).substr(2, 9) };
-}
+export const paymentService = new PaymentService();

@@ -1,26 +1,38 @@
 "use strict";
 
-import { getUser } from '../services/userService';
-import { Request, Response } from 'express';
+import { NextApiRequest, NextApiResponse } from 'next';
+import { userService } from '../services/userService';
+import { logger } from '../../../shared/logger';
+import { getSession } from 'next-auth/react';
 
-/**
- * Handles GET request to fetch user details
- * @param req - Express request object
- * @param res - Express response object
- */
-export async function GET(req: Request, res: Response) {
+const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     try {
-        // Extract userId from request - adjust based on your auth system
-        const userId = req.user?.id || req.query.userId || req.body.userId;
+        const session = await getSession({ req });
+        let userId = req.query.userId as string || session?.user?.id;
         
+        // Handle guest checkout scenario
         if (!userId) {
-            return res.status(400).json({ error: "User ID is required" });
+            logger.info('Handling guest checkout request');
+            return res.status(200).json({
+                isGuest: true,
+                message: 'Guest checkout enabled'
+            });
         }
         
-        const user = await getUser({ userId });
+        const user = await userService.getUser(userId);
+        
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
         return res.status(200).json(user);
     } catch (error) {
-        console.error("Error fetching user:", error);
-        return res.status(500).json({ error: "Failed to fetch user details" });
+        logger.error('Error in user API:', error);
+        return res.status(500).json({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
     }
-}
+};
+
+export default handler;

@@ -1,31 +1,43 @@
 "use strict";
 
-interface UserParams {
-    userId: string;
-}
+import { User } from '../models/user';
+import { UserRepository } from '../repositories/userRepository';
+import { logger } from '../../../shared/logger';
 
-interface User {
-    id: string;
-    name: string;
-    // Add other user properties as needed
-}
+class UserService {
+    private userRepository: UserRepository;
 
-/**
- * Retrieves a user by their ID
- * @param params - Object containing userId
- * @throws {Error} If userId is not provided
- */
-export async function getUser(params: UserParams): Promise<User> {
-    if (!params?.userId) {
-        throw new Error("User ID is required to fetch user details");
+    constructor() {
+        this.userRepository = new UserRepository();
     }
-    
-    // Mock implementation - replace with actual database call
-    return {
-        id: params.userId,
-        name: "Sample User"
-        // Add other user properties
-    };
+
+    async getUser(userId?: string): Promise<User | null> {
+        if (!userId) {
+            logger.warn('getUser called without userId - possible guest checkout');
+            return null;
+        }
+
+        try {
+            const user = await this.userRepository.findById(userId);
+            if (!user) {
+                logger.error(`User not found for ID: ${userId}`);
+                return null;
+            }
+            return user;
+        } catch (error) {
+            logger.error(`Error fetching user ${userId}:`, error);
+            throw new Error('Failed to retrieve user information');
+        }
+    }
+
+    async getUserByEmail(email: string): Promise<User | null> {
+        try {
+            return await this.userRepository.findByEmail(email);
+        } catch (error) {
+            logger.error(`Error fetching user by email ${email}:`, error);
+            throw new Error('Failed to retrieve user information');
+        }
+    }
 }
 
-// Add other user service functions as needed
+export const userService = new UserService();
