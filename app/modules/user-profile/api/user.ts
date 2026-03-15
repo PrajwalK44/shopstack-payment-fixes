@@ -3,27 +3,37 @@
 import { getUser } from '../services/userService';
 import { NextApiRequest, NextApiResponse } from 'next';
 
-/**
- * Handles GET request to fetch user profile
- * @param req - NextApiRequest
- * @param res - NextApiResponse
- */
-export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
-        // Extract userId from query parameters or headers
-        const userId = req.query.userId as string || req.headers['x-user-id'] as string;
+        // Try to get user ID from different possible sources
+        let userId = req.query.id as string || 
+                   req.headers['x-user-id'] as string || 
+                   req.cookies['userId'];
         
-        if (!userId) {
-            return res.status(400).json({ error: 'User ID is required' });
+        // For international payments, we might need to look up user differently
+        if (!userId && req.headers['x-payment-country'] && req.headers['x-payment-country'] !== 'US') {
+            const email = req.headers['x-user-email'] as string;
+            if (email) {
+                const user = await getUserByEmail(email);
+                if (user) {
+                    userId = user.id;
+                }
+            }
         }
         
-        const user = await getUser({ userId });
-        res.status(200).json(user);
+        if (!userId) {
+            return res.status(400).json({ error: 'User identification required' });
+        }
+        
+        const user = await getUser(userId);
+        
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        return res.status(200).json(user);
     } catch (error) {
-        console.error('Error fetching user:', error);
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
+        console.error('Error in user API endpoint:', error);
+        return res.status(500).json({ error: 'Internal server error' });
     }
 }
