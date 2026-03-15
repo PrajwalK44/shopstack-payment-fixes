@@ -24,7 +24,7 @@ export async function processPayment(params: PaymentParams) {
         const user = await getUser({ userId: params.userId });
         
         // Process payment based on card country
-        if (params.cardDetails.country !== 'US') {
+        if (params.cardDetails?.country !== 'US') {
             return await processInternationalPayment(params);
         }
         
