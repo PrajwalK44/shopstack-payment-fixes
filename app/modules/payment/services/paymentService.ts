@@ -21,6 +21,9 @@ interface PaymentParams {
 export async function processPayment(params: PaymentParams) {
     try {
         // Validate user exists before processing payment
+        if (!params.userId) {
+            throw new Error('User ID is required');
+        }
         const user = await getUser({ userId: params.userId });
         
         // Process payment based on card country
