@@ -1,40 +1,34 @@
 "use strict";
 
-interface User {
-    id: string;
-    name: string;
-    email: string;
-    // other user properties
-}
+import { User } from '../models/user';
+import { UserRepository } from '../repositories/userRepository';
 
-interface GetUserParams {
-    userId: string;
-}
+const userRepository = new UserRepository();
 
-/**
- * Retrieves a user by their ID
- * @param params - Object containing userId
- * @returns Promise<User>
- * @throws Error if userId is not provided
- */
-export async function getUser(params: GetUserParams): Promise<User> {
-    if (!params?.userId) {
-        throw new Error('User ID is required');
+export const getUser = async (userId: string | undefined): Promise<User | null> => {
+    if (!userId || typeof userId !== 'string') {
+        console.warn('Invalid or missing user ID provided to getUser');
+        return null;
     }
     
-    // Simulate database call
-    const user = await database.getUserById(params.userId);
-    if (!user) {
-        throw new Error('User not found');
+    try {
+        return await userRepository.findById(userId);
+    } catch (error) {
+        console.error(`Error fetching user with ID ${userId}:`, error);
+        throw error;
+    }
+};
+
+export const getUserByEmail = async (email: string): Promise<User | null> => {
+    if (!email || typeof email !== 'string') {
+        console.warn('Invalid or missing email provided to getUserByEmail');
+        return null;
     }
     
-    return user;
-}
-
-// Mock database for illustration
-const database = {
-    getUserById: async (id: string) => {
-        // Implementation would query the database
-        return { id, name: 'Test User', email: 'test@example.com' };
+    try {
+        return await userRepository.findByEmail(email);
+    } catch (error) {
+        console.error(`Error fetching user with email ${email}:`, error);
+        throw error;
     }
 };
