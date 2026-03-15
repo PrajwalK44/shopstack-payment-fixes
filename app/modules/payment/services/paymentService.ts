@@ -1,5 +1,7 @@
 "use strict";
 
+import { getUser } from '../../user-profile/services/userService';
+
 interface PaymentParams {
     userId: string;
     cardDetails: {
@@ -11,64 +13,39 @@ interface PaymentParams {
     amount: number;
 }
 
-interface PaymentResult {
-    success: boolean;
-    transactionId?: string;
-    error?: string;
-}
-
 /**
- * Processes a payment
- * @param params - Payment parameters including userId and card details
- * @throws {Error} If required parameters are missing
+ * Processes payment for a user
+ * @param params - Payment parameters
+ * @returns Promise<{ success: boolean, transactionId?: string }>
  */
-export async function processPayment(params: PaymentParams): Promise<PaymentResult> {
-    // Validate required parameters
-    if (!params?.userId) {
-        throw new Error("User ID is required for payment processing");
-    }
-    
-    if (!params?.cardDetails) {
-        throw new Error("Card details are required");
-    }
-    
+export async function processPayment(params: PaymentParams) {
     try {
-        // Determine if this is an international card
-        const isInternational = params.cardDetails.country !== 'US';
+        // Validate user exists before processing payment
+        const user = await getUser({ userId: params.userId });
         
-        // Common payment processing logic
-        if (isInternational) {
-            // International card processing path
-            // Ensure userId is passed to any subsequent service calls
-            const user = await getUserProfile(params.userId);
-            
-            // Process international payment
+        // Process payment based on card country
+        if (params.cardDetails.country !== 'US') {
             return await processInternationalPayment(params);
-        } else {
-            // Domestic card processing path
-            return await processDomesticPayment(params);
         }
+        
+        return await processUSPayment(params);
     } catch (error) {
-        console.error("Payment processing failed:", error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : "Unknown payment error"
-        };
+        console.error('Payment processing failed:', error);
+        throw error;
     }
 }
 
-// Helper functions (mock implementations - replace with actual implementations)
-async function getUserProfile(userId: string) {
-    // Implementation to get user profile
-    return { id: userId, name: "User" };
+async function processUSPayment(params: PaymentParams) {
+    // US payment processing logic
+    return { success: true, transactionId: 'us_' + Date.now() };
 }
 
 async function processInternationalPayment(params: PaymentParams) {
     // International payment processing logic
-    return { success: true, transactionId: "intl_" + Math.random().toString(36).substr(2, 9) };
-}
-
-async function processDomesticPayment(params: PaymentParams) {
-    // Domestic payment processing logic
-    return { success: true, transactionId: "dom_" + Math.random().toString(36).substr(2, 9) };
+    // Ensure all parameters are properly passed through
+    if (!params.userId) {
+        throw new Error('User ID is required for international payments');
+    }
+    
+    return { success: true, transactionId: 'intl_' + Date.now() };
 }

@@ -1,31 +1,40 @@
 "use strict";
 
-interface UserParams {
-    userId: string;
-}
-
 interface User {
     id: string;
     name: string;
-    // Add other user properties as needed
+    email: string;
+    // other user properties
+}
+
+interface GetUserParams {
+    userId: string;
 }
 
 /**
  * Retrieves a user by their ID
  * @param params - Object containing userId
- * @throws {Error} If userId is not provided
+ * @returns Promise<User>
+ * @throws Error if userId is not provided
  */
-export async function getUser(params: UserParams): Promise<User> {
+export async function getUser(params: GetUserParams): Promise<User> {
     if (!params?.userId) {
-        throw new Error("User ID is required to fetch user details");
+        throw new Error('User ID is required');
     }
     
-    // Mock implementation - replace with actual database call
-    return {
-        id: params.userId,
-        name: "Sample User"
-        // Add other user properties
-    };
+    // Simulate database call
+    const user = await database.getUserById(params.userId);
+    if (!user) {
+        throw new Error('User not found');
+    }
+    
+    return user;
 }
 
-// Add other user service functions as needed
+// Mock database for illustration
+const database = {
+    getUserById: async (id: string) => {
+        // Implementation would query the database
+        return { id, name: 'Test User', email: 'test@example.com' };
+    }
+};
